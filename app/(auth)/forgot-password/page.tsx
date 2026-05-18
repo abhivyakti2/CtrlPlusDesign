@@ -37,7 +37,7 @@ export default function ForgotPasswordPage() {
   if (isSuccess) {
     return (
       <div className="w-full max-w-md mx-auto mt-12">
-        <Alert variant="default" className="bg-green-900/40 border-green-500 text-green-200">
+        <Alert variant="success" className="bg-green-900/40 border-green-500 text-green-200">
           If an account exists with this email, a password reset link has been sent.
         </Alert>
         <div className="mt-4 text-center">

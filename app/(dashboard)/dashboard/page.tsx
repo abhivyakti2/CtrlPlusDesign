@@ -80,7 +80,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex gap-2">
             <Link href="/create">
-              <Button variant="primary" size="default">
+              <Button variant="primary" size="md">
                 <Plus size={16} className="mr-2" />
                 New Design
               </Button>

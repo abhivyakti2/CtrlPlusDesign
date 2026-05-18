@@ -170,31 +170,49 @@ const distancePointToSegment = (
   return Math.sqrt(pdx * pdx + pdy * pdy);
 };
 
+interface ArrowDisplayLine {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+function getArrowDisplayLine(
+  metadata: Record<string, unknown> | undefined
+): ArrowDisplayLine | null {
+  const line = metadata?.displayLine;
+  if (!line || typeof line !== "object") return null;
+  const dl = line as Record<string, unknown>;
+  if (
+    typeof dl.x1 === "number" &&
+    typeof dl.y1 === "number" &&
+    typeof dl.x2 === "number" &&
+    typeof dl.y2 === "number"
+  ) {
+    return { x1: dl.x1, y1: dl.y1, x2: dl.x2, y2: dl.y2 };
+  }
+  return null;
+}
+
 export const hitTestArrow = (
   arrow: Arrow,
   point: Vec2,
   threshold: number = 5
 ): boolean => {
-  // Arrow connects two shapes center-to-center
-  // We don't have the shapes here, so we'll use arrow source/target if available
-  // For now, return false if arrow lacks connection info
-  if (!arrow.sourceShapeId || !arrow.targetShapeId) {
+  if (!arrow.fromShapeId || !arrow.toShapeId) {
     return false;
   }
 
-  // This is a simplified check - in a full implementation,
-  // you would pass the actual shape positions to calculate the arrow endpoints
-  // For now, we use a marker property if available
-  if (arrow.metadata?.displayLine?.x1 !== undefined && arrow.metadata?.displayLine?.x2 !== undefined) {
+  const displayLine = getArrowDisplayLine(arrow.metadata);
+  if (displayLine) {
     const dist = distancePointToSegment(
       point,
-      { x: arrow.metadata.displayLine.x1, y: arrow.metadata.displayLine.y1 },
-      { x: arrow.metadata.displayLine.x2, y: arrow.metadata.displayLine.y2 }
+      { x: displayLine.x1, y: displayLine.y1 },
+      { x: displayLine.x2, y: displayLine.y2 }
     );
     return dist <= threshold;
   }
 
-  // Fallback: return false if we can't determine arrow position
   return false;
 };
 
