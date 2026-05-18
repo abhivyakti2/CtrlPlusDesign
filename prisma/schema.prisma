@@ -1,0 +1,287 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============== AUTH & USER ==============
+model User {
+  id                    String          @id @default(cuid())
+  email                 String          @unique
+  password              String // bcrypt hashed
+  profileImage          String?
+  bio                   String?
+  experienceLevel       ExperienceLevel @default(FRESHER)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  
+  // Relations
+  canvases              Canvas[]
+  attempts              Attempt[]
+  performanceMetrics    PerformanceMetric?
+  sessions              Session[]
+  
+  @@index([email])
+}
+
+enum ExperienceLevel {
+  FRESHER
+  SDE1
+  SDE2
+  SENIOR_ENGINEER
+  STAFF_ENGINEER
+  ARCHITECT
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  sessionToken String  @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires   DateTime
+  createdAt DateTime  @default(now())
+  
+  @@index([userId])
+}
+
+// ============== CANVAS & DOCUMENTS ==============
+model Canvas {
+  id                  String              @id @default(cuid())
+  userId              String
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title               String              @default("Untitled")
+  description         String?
+  problemStatement    String?
+  content             Json                // Serialized canvas data
+  thumbnail           String?
+  
+  difficulty          Difficulty          @default(MEDIUM)
+  tags                String[]            @default([])
+  visibility          Visibility          @default(PRIVATE)
+  shareToken          String?             @unique
+  
+  score               Float?              // Overall quality score
+  completionStatus    Float?              // 0-100 percentage
+  
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  // Relations
+  attempts            Attempt[]
+  aiEvaluations       AIEvaluation[]
+  comments            Comment[]
+  
+  @@index([userId])
+  @@index([visibility, createdAt])
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+  EXPERT
+}
+
+enum Visibility {
+  PRIVATE
+  PUBLIC
+  SHARED
+}
+
+// ============== PERFORMANCE TRACKING ==============
+model Attempt {
+  id                  String              @id @default(cuid())
+  canvasId            String
+  canvas              Canvas              @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  attemptNumber       Int
+  content             Json                // Canvas state at this attempt
+  score               Float?
+  completionTime      Int?                // seconds
+  completeness        Float?              // 0-100
+  qualityScore        Float?              // 0-100
+  
+  mistakes            String[]            @default([])
+  missingComponents   String[]            @default([])
+  strengths           String[]            @default([])
+  improvements        String[]            @default([])
+  
+  createdAt           DateTime            @default(now())
+  
+  @@index([canvasId])
+  @@index([userId])
+  @@unique([canvasId, attemptNumber])
+}
+
+model PerformanceMetric {
+  id                  String              @id @default(cuid())
+  userId              String              @unique
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  totalAttempts       Int                 @default(0)
+  averageScore        Float?
+  commonMistakes      Json                // Array of mistake patterns
+  weakAreas           String[]            @default([])
+  strongAreas         String[]            @default([])
+  progressTrend       Json?               // Array of weekly progress
+  
+  lastAttemptDate     DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+}
+
+// ============== AI EVALUATION ==============
+model AIEvaluation {
+  id                  String              @id @default(cuid())
+  canvasId            String
+  canvas              Canvas              @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  
+  architectureScore   Float?
+  completenessScore   Float?
+  scalabilityScore    Float?
+  securityScore       Float?
+  
+  findings            EvaluationFinding[]
+  recommendations     EvaluationRecommendation[]
+  
+  evaluatedAt         DateTime            @default(now())
+  
+  @@index([canvasId])
+}
+
+model EvaluationFinding {
+  id                  String              @id @default(cuid())
+  evaluationId        String
+  evaluation          AIEvaluation        @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  
+  severity            FindingSeverity
+  category            FindingCategory
+  title               String
+  description         String
+  suggestion          String?
+  affectedShapeIds    String[]            @default([])
+  
+  @@index([evaluationId])
+}
+
+enum FindingSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+}
+
+enum FindingCategory {
+  ARCHITECTURE
+  SCALABILITY
+  SECURITY
+  PERFORMANCE
+  CONSISTENCY
+  CACHING
+  DATABASE
+  API_DESIGN
+  INFRASTRUCTURE
+  OBSERVABILITY
+  COST
+  OTHER
+}
+
+model EvaluationRecommendation {
+  id                  String              @id @default(cuid())
+  evaluationId        String
+  evaluation          AIEvaluation        @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  
+  category            String
+  title               String
+  description         String
+  priority            Int
+  relatedComponents   String[]            @default([])
+  
+  @@index([evaluationId])
+}
+
+// ============== COLLABORATION ==============
+model Comment {
+  id                  String              @id @default(cuid())
+  canvasId            String
+  canvas              Canvas              @relation(fields: [canvasId], references: [id], onDelete: Cascade)
+  
+  content             String
+  position            Json                // {x, y} on canvas
+  shapeId             String?
+  
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+}
+
+// ============== SYSTEM DESIGN PROBLEMS ==============
+model SystemDesignProblem {
+  id                  String              @id @default(cuid())
+  
+  title               String
+  description         String
+  detailedDescription String?
+  
+  difficulty          Difficulty
+  tags                String[]            @default([])
+  companies           String[]            @default([])
+  
+  requirements        Json                // Structured requirements
+  sampleSolution      String?             // Reference solution
+  
+  averageScore        Float?
+  attemptCount        Int                 @default(0)
+  
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  @@index([difficulty])
+}
+
+// ============== KNOWLEDGE & RAG ==============
+model KnowledgeBase {
+  id                  String              @id @default(cuid())
+  
+  content             String
+  source              String              // URL, PDF name, etc.
+  vectorEmbedding     Float[]             // For vector DB
+  metadata            Json?
+  
+  createdAt           DateTime            @default(now())
+  
+  @@index([source])
+}
+
+// ============== SYSTEM DESIGN TEMPLATES ==============
+model ArchitectureTemplate {
+  id                  String              @id @default(cuid())
+  
+  name                String
+  description         String
+  category            String              // e.g., "Social Media", "E-commerce"
+  
+  canvasData          Json                // Pre-built canvas shapes
+  components          String[]            @default([])
+  
+  createdAt           DateTime            @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([email, token])
+}
