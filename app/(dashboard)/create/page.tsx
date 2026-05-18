@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { ProblemSelector } from "@/components/problems/problem-selector";
 import { RecommendationEngine } from "@/components/RecommendationEngine";
@@ -15,7 +15,7 @@ function cleanProblemTitle(title: string): string {
   return title.replace(/^Design\s+(a|an)\s+/i, "");
 }
 
-export default function CreateDesignPage() {
+function CreateDesignContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isCreating, setIsCreating] = useState(false);
@@ -149,5 +149,24 @@ export default function CreateDesignPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function CreateDesignPage() {
+  return (
+    <Suspense
+      fallback={
+        <DashboardLayout>
+          <div className="flex items-center justify-center h-screen">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-accent mb-4" />
+              <p className="text-gray-400">Loading...</p>
+            </div>
+          </div>
+        </DashboardLayout>
+      }
+    >
+      <CreateDesignContent />
+    </Suspense>
   );
 }
