@@ -76,7 +76,7 @@ export default function DashboardPage() {
         <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-4xl font-bold text-white mb-2">Dashboard</h1>
-            <p className="text-gray-400">Welcome back! Here's your progress and latest designs.</p>
+            <p className="text-gray-400">Welcome back! Here&apos;s your progress and latest designs.</p>
           </div>
           <div className="flex gap-2">
             <Link href="/create">
