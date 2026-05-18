@@ -8,7 +8,7 @@ import { Providers } from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ArchitectIQ - System Design Interview Practice",
+  title: "Ctrl+Design - System Design Interview Practice",
   description:
     "AI-powered system design interview practice platform with real-time evaluation and feedback",
 };

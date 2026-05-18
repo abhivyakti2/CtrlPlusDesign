@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ArchitectIQ — System Design Studio</title>
+<title>Ctrl+Design — System Design Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -59,7 +59,7 @@ input,textarea,select{font-family:inherit;color:inherit;background:none;border:n
 /* NAV */
 .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid var(--border);background:var(--bg-secondary);position:relative;z-index:10}
 .nav-brand{display:flex;align-items:center;gap:10px}
-.nav-logo{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff;position:relative;overflow:hidden}
+.nav-logo{min-width:40px;height:32px;padding:0 6px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;color:#fff;position:relative;overflow:hidden}
 .nav-logo::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,#5b7fff,#a78bfa)}
 .nav-logo-text{font-family:'Instrument Serif',serif;font-size:20px;color:var(--text-primary)}
 .nav-logo-sub{font-size:11px;color:var(--text-muted);font-weight:400;margin-left:4px;letter-spacing:0.5px}
@@ -360,8 +360,8 @@ input,textarea,select{font-family:inherit;color:inherit;background:none;border:n
 <div id="dashboard-screen" class="screen active">
   <nav class="nav">
     <div class="nav-brand">
-      <div class="nav-logo">A</div>
-      <span class="nav-logo-text">ArchitectIQ</span>
+      <div class="nav-logo">Ctrl</div>
+      <span class="nav-logo-text">Ctrl+Design</span>
       <span class="nav-logo-sub">Beta</span>
     </div>
     <div class="nav-actions">
@@ -998,7 +998,7 @@ Using a microservices architecture with:
       <div style="margin-bottom:16px">
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;font-weight:500">Public Share Link</div>
         <div class="share-url">
-          <input class="share-url-input" value="https://architectiq.app/d/tw-design-abc123" readonly>
+          <input class="share-url-input" value="https://ctrl-design.app/d/tw-design-abc123" readonly>
           <button class="copy-btn" onclick="copyShareLink()">Copy</button>
         </div>
       </div>
@@ -2431,7 +2431,7 @@ function addCanvasCard(){
 
 // ---- SHARING ----
 function copyShareLink(){
-  navigator.clipboard?.writeText('https://architectiq.app/d/abc123').catch(()=>{});
+  navigator.clipboard?.writeText('https://ctrl-design.app/d/abc123').catch(()=>{});
   showToast('Link copied to clipboard!','⇈');
 }
 

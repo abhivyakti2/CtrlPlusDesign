@@ -76,7 +76,7 @@ export const SignupForm: React.FC = () => {
       <CardHeader>
         <CardTitle>Create Account</CardTitle>
         <CardDescription>
-          Join ArchitectIQ and start practicing system design
+          Join Ctrl+Design and start practicing system design
         </CardDescription>
       </CardHeader>
 

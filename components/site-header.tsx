@@ -17,11 +17,13 @@ export const SiteBrand: React.FC<SiteBrandProps> = ({
 }) => {
   return (
     <Link href="/dashboard" className={`flex items-center gap-2 ${className}`}>
-      <div className="w-10 h-10 bg-gradient-to-br from-[#5b7fff] to-[#a78bfa] rounded-lg flex items-center justify-center">
-        <span className="text-white font-bold text-lg">A</span>
+      <div className="min-w-[2.75rem] h-10 px-1.5 bg-gradient-to-br from-[#5b7fff] to-[#a78bfa] rounded-lg flex items-center justify-center">
+        <span className="text-white font-bold text-[10px] leading-none tracking-tight">
+          Ctrl
+        </span>
       </div>
       {showName && (
-        <span className="text-xl font-bold text-white">ArchitectIQ</span>
+        <span className="text-xl font-bold text-white">Ctrl+Design</span>
       )}
     </Link>
   );

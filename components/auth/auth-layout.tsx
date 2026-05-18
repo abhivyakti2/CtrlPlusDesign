@@ -20,7 +20,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
         {/* Logo / Header */}
         <div className="mb-12 text-center">
           <h1 className="text-4xl font-bold text-text-primary font-serif mb-2">
-            ArchitectIQ
+            Ctrl+Design
           </h1>
           <p className="text-text-secondary">
             AI-Powered System Design Interview Practice
@@ -34,7 +34,7 @@ export const AuthLayout: React.FC<AuthLayoutProps> = ({ children }) => {
 
         {/* Footer */}
         <div className="mt-12 text-center text-sm text-text-muted">
-          <p>© 2026 ArchitectIQ. All rights reserved.</p>
+          <p>© 2026 Ctrl+Design. All rights reserved.</p>
         </div>
       </div>
     </div>
