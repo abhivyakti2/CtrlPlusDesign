@@ -6,11 +6,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { listDesigns } from "@/lib/actions/designs";
+import { deleteDesign, listDesigns } from "@/lib/actions/designs";
+import { clearLocalAutosave } from "@/lib/canvas-autosave";
 import {
   Search,
   Plus,
   ArrowRight,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -54,6 +56,24 @@ export default function DesignsPage() {
     return designs.filter((design) => design.title.toLowerCase().includes(query));
   }, [designs, searchQuery]);
 
+  const handleDeleteDesign = async (design: DesignListItem) => {
+    const confirmed = window.confirm(
+      `Delete "${design.title}"? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) throw new Error("Not authenticated");
+
+      await deleteDesign(design.id, token);
+      clearLocalAutosave(design.id);
+      setDesigns((prev) => prev.filter((d) => d.id !== design.id));
+    } catch {
+      window.alert("Failed to delete design");
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="p-8">
@@ -94,21 +114,35 @@ export default function DesignsPage() {
           <div className="bg-gray-800 rounded-lg border border-gray-700 p-12">
             <div className="space-y-4">
               {filteredDesigns.map((design) => (
-                <Link
+                <div
                   key={design.id}
-                  href={`/editor-new?designId=${design.id}`}
-                  className="flex items-center justify-between rounded-lg border border-gray-700 bg-gray-900 p-4 hover:border-gray-600 transition-colors"
+                  className="flex items-center gap-3 rounded-lg border border-gray-700 bg-gray-900 p-4 hover:border-gray-600 transition-colors"
                 >
-                  <div>
-                    <h3 className="text-xl font-semibold text-white mb-2">
-                      {design.title}
-                    </h3>
-                    <p className="text-gray-400">
-                      {design.difficulty} - Updated {formatDate(design.updatedAt)}
-                    </p>
-                  </div>
-                  <ArrowRight size={20} className="text-gray-500" />
-                </Link>
+                  <Link
+                    href={`/editor-new?designId=${design.id}`}
+                    className="flex flex-1 items-center justify-between min-w-0"
+                  >
+                    <div className="min-w-0">
+                      <h3 className="text-xl font-semibold text-white mb-2 truncate">
+                        {design.title}
+                      </h3>
+                      <p className="text-gray-400">
+                        {design.difficulty} - Updated {formatDate(design.updatedAt)}
+                      </p>
+                    </div>
+                    <ArrowRight size={20} className="text-gray-500 shrink-0 ml-4" />
+                  </Link>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    title="Delete design"
+                    className="text-red-400 hover:text-red-300 hover:bg-red-950/40 shrink-0"
+                    onClick={() => handleDeleteDesign(design)}
+                  >
+                    <Trash2 size={18} />
+                  </Button>
+                </div>
               ))}
             </div>
           </div>

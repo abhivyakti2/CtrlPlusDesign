@@ -2,7 +2,8 @@
 
 "use client";
 
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { Suspense, useRef, useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/protected-route";
 import { useCanvasStore } from "@/store/canvasStore";
 import { CanvasEngine } from "@/canvas/engine";
@@ -15,10 +16,17 @@ import { ToolsPanel } from "@/components/canvas/tools-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InlineTextEditor } from "@/components/canvas/InlineTextEditor";
 import { ShapeDetailPanel } from "@/components/canvas/ShapeDetailPanel";
-import { getDesign, updateDesign } from "@/lib/actions/designs";
+import { deleteDesign, getDesign, updateDesign } from "@/lib/actions/designs";
+import { useCanvasAutosave } from "@/hooks/useCanvasAutosave";
+import {
+  clearLocalAutosave,
+  readLocalAutosave,
+  resolveCanvasFromAutosave,
+} from "@/lib/canvas-autosave";
 import {
   Download,
   Save,
+  Trash2,
   Undo2,
   Redo2,
   Share2,
@@ -41,8 +49,10 @@ function parseDesignContent(content: unknown) {
   return { shapes: [], arrows: [], groups: [] };
 }
 
-export default function EditorNewPage() {
-  const [designId, setDesignId] = useState<string | null>(null);
+function EditorNewPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const designId = searchParams.get("designId");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<CanvasEngine | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
@@ -51,7 +61,7 @@ export default function EditorNewPage() {
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluation, setEvaluation] = useState<any>(null);
   const [showEvaluation, setShowEvaluation] = useState(false);
-  const titleSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [canvasReady, setCanvasReady] = useState(false);
   const [viewState, setViewState] = useState<ViewState>({
     offsetX: 0,
     offsetY: 0,
@@ -81,23 +91,11 @@ export default function EditorNewPage() {
     (state) => state.editorState.selection.shapeIds
   );
 
-  useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("designId");
-    setDesignId(id);
-    // Clear design_loaded marker if no design ID (new blank canvas)
-    if (!id) {
-      sessionStorage.removeItem("design_loaded");
-    }
-  }, []);
-
-  useEffect(() => {
-    // Cleanup on unmount
-    return () => {
-      if (titleSaveTimerRef.current) {
-        clearTimeout(titleSaveTimerRef.current);
-      }
-    };
-  }, []);
+  useCanvasAutosave({
+    designId,
+    title,
+    enabled: canvasReady,
+  });
 
   const containerRef = useCallback((container: HTMLDivElement | null) => {
     if (!container) {
@@ -127,27 +125,62 @@ export default function EditorNewPage() {
   }, []); // no deps — stable callback
 
   useEffect(() => {
+    setCanvasReady(false);
+    useCanvasStore.getState().reset();
+
     const loadDesign = async () => {
+      if (!designId) {
+        const draft = readLocalAutosave("draft");
+        if (draft?.shapes?.length || draft?.arrows?.length) {
+          if (draft.title) setTitle(draft.title);
+          loadSnapshot({
+            id: "draft",
+            version: 1,
+            timestamp: draft.savedAt,
+            shapes: draft.shapes,
+            arrows: draft.arrows,
+            viewState: {
+              offsetX: 0,
+              offsetY: 0,
+              zoom: 1,
+              width: canvasRef.current?.width ?? 0,
+              height: canvasRef.current?.height ?? 0,
+            },
+            metadata: { title: draft.title ?? "Untitled Design" },
+          });
+          setTimeout(() => engineRef.current?.render(), 50);
+        }
+        setCanvasReady(true);
+        return;
+      }
+
       const token = localStorage.getItem("authToken");
-      if (!token || !designId) return;
+      if (!token) {
+        setCanvasReady(true);
+        return;
+      }
 
       try {
         const design = await getDesign(designId, token);
         const content = parseDesignContent(design.content);
+        const serverUpdatedAt = new Date(design.updatedAt).getTime();
 
-        setTitle(design.title);
+        const resolved = resolveCanvasFromAutosave(
+          designId,
+          content.shapes ?? [],
+          content.arrows ?? [],
+          serverUpdatedAt,
+          design.title
+        );
 
-        // Mark that a design has been loaded to prevent autosave from overwriting it
-        sessionStorage.setItem("design_loaded", "true");
-        // Clear autosave so the engine doesn't re-apply it on top of loaded design
-        localStorage.removeItem("ctrl_design_autosave");
+        if (resolved.title) setTitle(resolved.title);
 
         loadSnapshot({
           id: design.id,
           version: 1,
-          timestamp: new Date(design.updatedAt).getTime(),
-          shapes: content.shapes ?? [],
-          arrows: content.arrows ?? [],
+          timestamp: resolved.usedLocal ? Date.now() : serverUpdatedAt,
+          shapes: resolved.shapes,
+          arrows: resolved.arrows,
           viewState: {
             offsetX: 0,
             offsetY: 0,
@@ -156,20 +189,41 @@ export default function EditorNewPage() {
             height: canvasRef.current?.height ?? 0,
           },
           metadata: {
-            title: design.title,
+            title: resolved.title ?? design.title,
             description: design.description ?? undefined,
           },
         });
 
-        // Force repaint after store update settles
         setTimeout(() => engineRef.current?.render(), 50);
       } catch (err) {
         console.error("Failed to load design:", err);
+      } finally {
+        setCanvasReady(true);
       }
     };
 
     loadDesign();
   }, [designId, loadSnapshot]);
+
+  const handleDeleteDesign = async () => {
+    if (!designId) return;
+
+    const confirmed = window.confirm(
+      `Delete "${title}"? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) throw new Error("Not authenticated");
+
+      await deleteDesign(designId, token);
+      clearLocalAutosave(designId);
+      router.push("/designs");
+    } catch {
+      window.alert?.("Failed to delete design");
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -192,8 +246,7 @@ export default function EditorNewPage() {
         },
       });
       
-      // Clear autosave after successful save
-      localStorage.removeItem("ctrl_design_autosave");
+      if (designId) clearLocalAutosave(designId);
       window.alert?.("Design saved successfully!");
     } catch {
       window.alert?.("Failed to save design");
@@ -307,57 +360,7 @@ export default function EditorNewPage() {
             <div className="flex-1 flex items-center gap-2">
               <Input
                 value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  // Auto-save title on change with debounce
-                  if (titleSaveTimerRef.current) {
-                    clearTimeout(titleSaveTimerRef.current);
-                  }
-                  titleSaveTimerRef.current = setTimeout(() => {
-                    if (designId) {
-                      const token = localStorage.getItem("authToken");
-                      if (token) {
-                        updateDesign(designId, token, {
-                          title: e.target.value,
-                          content: {
-                            shapes: Array.from(shapes.values()),
-                            arrows: Array.from(arrows.values()),
-                            groups: [],
-                          },
-                        })
-                          .then(() => {
-                            // Clear autosave after successful save
-                            localStorage.removeItem("ctrl_design_autosave");
-                          })
-                          .catch(err => console.error("Failed to autosave title", err));
-                      }
-                    }
-                  }, 1000);
-                }}
-                onBlur={() => {
-                  // Save immediately on blur
-                  if (titleSaveTimerRef.current) {
-                    clearTimeout(titleSaveTimerRef.current);
-                  }
-                  if (designId && title) {
-                    const token = localStorage.getItem("authToken");
-                    if (token) {
-                      updateDesign(designId, token, {
-                        title,
-                        content: {
-                          shapes: Array.from(shapes.values()),
-                          arrows: Array.from(arrows.values()),
-                          groups: [],
-                        },
-                      })
-                        .then(() => {
-                          // Clear autosave after successful save
-                          localStorage.removeItem("ctrl_design_autosave");
-                        })
-                        .catch(err => console.error("Failed to save title", err));
-                    }
-                  }
-                }}
+                onChange={(e) => setTitle(e.target.value)}
                 className="max-w-xs bg-gray-800 border-gray-700"
                 placeholder="Design title"
               />
@@ -422,6 +425,19 @@ export default function EditorNewPage() {
                 <Save size={18} className="mr-1" />
                 Save
               </Button>
+
+              {designId && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDeleteDesign}
+                  title="Delete design"
+                  className="text-red-400 hover:text-red-300 hover:bg-red-950/40"
+                >
+                  <Trash2 size={18} className="mr-1" />
+                  Delete
+                </Button>
+              )}
             </div>
           </SiteHeader>
 
@@ -548,5 +564,19 @@ export default function EditorNewPage() {
         </div>
       </div>
     </ProtectedRoute>
+  );
+}
+
+export default function EditorNewPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen items-center justify-center bg-gray-950 text-gray-400">
+          Loading editor…
+        </div>
+      }
+    >
+      <EditorNewPageContent />
+    </Suspense>
   );
 }

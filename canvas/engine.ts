@@ -12,33 +12,6 @@ interface CanvasEngineOptions {
   onViewStateChange?: (viewState: ViewState) => void;
 }
 
-// ── Autosave helpers ──────────────────────────────────────────────────────────
-const AUTOSAVE_KEY = "ctrl_design_autosave";
-
-function saveToLocalStorage(): void {
-  try {
-    const store = useCanvasStore.getState();
-    const data = {
-      shapes: store.getAllShapes(),
-      arrows: store.getAllArrows(),
-      savedAt: Date.now(),
-    };
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
-  } catch {
-    // quota exceeded or SSR — ignore
-  }
-}
-
-export function loadFromLocalStorage(): { shapes: Shape[]; arrows: any[] } | null {
-  try {
-    const raw = localStorage.getItem(AUTOSAVE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
 export class CanvasEngine {
   private canvas: HTMLCanvasElement;
   private renderer: CanvasRenderer;
@@ -59,14 +32,6 @@ export class CanvasEngine {
 
   // Per-shape start positions for group drag
   private groupDragStartPositions: Map<string, Vec2> | null = null;
-
-  // Autosave debounce timer
-  private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
-
-  // Store subscription for autosave
-  private storeUnsubscribe: (() => void) | null = null;
-  private lastSavedShapesCount = 0;
-  private lastSavedArrowsCount = 0;
 
   // Flag to prevent resize observer from triggering during renders
   private isRendering = false;
@@ -123,65 +88,13 @@ export class CanvasEngine {
       const tool = state.editorState.currentTool;
       if (tool !== this.interaction.getActiveTool()) {
         this.interaction.setTool(tool);
+        this.updateCanvasCursor(tool);
       }
     });
 
-    // Subscribe to store changes for autosave
-    this.storeUnsubscribe = useCanvasStore.subscribe((state) => {
-      const shapesCount = state.shapes.size;
-      const arrowsCount = state.arrows.size;
-      
-      // Trigger autosave if shapes or arrows have changed
-      if (shapesCount !== this.lastSavedShapesCount || arrowsCount !== this.lastSavedArrowsCount) {
-        this.lastSavedShapesCount = shapesCount;
-        this.lastSavedArrowsCount = arrowsCount;
-        this.scheduleAutosave();
-      }
-    });
-
+    this.updateCanvasCursor("select");
     this.setupEventListeners();
     this.emitViewStateChange();
-
-    // Restore autosaved canvas on init
-    this.restoreAutosave();
-  }
-
-  // ── Autosave ────────────────────────────────────────────────────────────────
-
-  private scheduleAutosave(): void {
-    if (this.autosaveTimer) clearTimeout(this.autosaveTimer);
-    this.autosaveTimer = setTimeout(() => {
-      saveToLocalStorage();
-    }, 500);
-  }
-
-  private restoreAutosave(): void {
-    // Don't restore if a design was explicitly loaded
-    if (sessionStorage.getItem("design_loaded")) {
-      // Clear autosave to prevent stale data
-      localStorage.removeItem(AUTOSAVE_KEY);
-      return;
-    }
-
-    const saved = loadFromLocalStorage();
-    if (!saved || (!saved.shapes?.length && !saved.arrows?.length)) return;
-    
-    const store = useCanvasStore.getState();
-    // Restore autosave on fresh canvas initialization
-    if (store.getAllShapes().length === 0) {
-      store.loadSnapshot({
-        id: "autosave",
-        version: 1,
-        timestamp: Date.now(),
-        shapes: saved.shapes ?? [],
-        arrows: saved.arrows ?? [],
-        viewState: this.viewState,
-        metadata: { title: "Autosaved" },
-      });
-      // Update the counters after loading
-      this.lastSavedShapesCount = saved.shapes?.length ?? 0;
-      this.lastSavedArrowsCount = saved.arrows?.length ?? 0;
-    }
   }
 
   public getViewState(): ViewState {
@@ -189,18 +102,22 @@ export class CanvasEngine {
   }
 
   /**
-   * Clear autosaved data (call after successful save to remote)
-   */
-  public clearAutosave(): void {
-    localStorage.removeItem(AUTOSAVE_KEY);
-  }
-
-  /**
    * Set active tool and update interaction engine
    */
   public setActiveTool(tool: EditorTool): void {
     this.interaction.setTool(tool);
+    this.updateCanvasCursor(tool);
     this.render();
+  }
+
+  private updateCanvasCursor(tool: EditorTool): void {
+    if (tool === "pan") {
+      this.canvas.style.cursor = "grab";
+    } else if (tool === "select") {
+      this.canvas.style.cursor = "default";
+    } else {
+      this.canvas.style.cursor = "crosshair";
+    }
   }
 
   private emitViewStateChange(): void {
@@ -213,12 +130,6 @@ export class CanvasEngine {
   public destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-
-    // Clean up store subscription
-    if (this.storeUnsubscribe) {
-      this.storeUnsubscribe();
-      this.storeUnsubscribe = null;
-    }
 
     if (this.boundHandlers) {
       this.canvas.removeEventListener("mousedown", this.boundHandlers.mousedown);
@@ -241,7 +152,6 @@ export class CanvasEngine {
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
 
-    if (this.autosaveTimer) clearTimeout(this.autosaveTimer);
     if (this.resizeDebounceTimer) clearTimeout(this.resizeDebounceTimer);
   }
 
@@ -525,7 +435,6 @@ export class CanvasEngine {
       strokeStyle: defaults.strokeStyle,
       bidirectional: false,
     });
-    this.scheduleAutosave();
   }
 
   private attachDraggedShapeToParent(shapeId: string): void {
@@ -588,6 +497,7 @@ export class CanvasEngine {
         } else if (hitId !== iState.arrowSourceShapeId) {
           // Second click - complete arrow to target
           this.createSemanticArrow(iState.arrowSourceShapeId, hitId);
+          this.pushHistorySnapshot();
           this.interaction.cancelArrow();
           store.clearSelection();
         }
@@ -616,7 +526,6 @@ export class CanvasEngine {
       }
       store.setSelection(new Set([newShape.id]));
       this.interaction.startDrawing(newShape.id);
-      this.scheduleAutosave();
       // Only render once after all state updates
       return;
     }
@@ -628,7 +537,6 @@ export class CanvasEngine {
         const shapeId = selectedShapes[0].id;
         store.deleteShape(shapeId);
         store.clearSelection();
-        this.scheduleAutosave();
         this.render();
         return;
       }
@@ -650,52 +558,53 @@ export class CanvasEngine {
     // PRIORITY 7: Shape hit testing
     const shapeId = this.hitTestShapes(worldPoint);
 
-    // PRIORITY 8: Marquee selection (Shift) or pan (normal) on empty canvas with select tool
-    if (!shapeId && activeTool === "select") {
-      if (e.shiftKey) {
-        // Shift+drag = marquee selection
-        this.interaction.startMarqueeSelect(worldPoint.x, worldPoint.y);
-        store.clearSelection();
-      } else {
-        // Normal drag on empty canvas = pan
-        this.interaction.startPanning();
-      }
+    // PRIORITY 8: Pan or marquee on empty canvas
+    if (!shapeId && activeTool === "pan") {
+      this.interaction.startPanning();
       this.render();
       return;
     }
 
-    // PRIORITY 9: Normal selection
-    if (activeTool === "select") {
-      if (shapeId) {
-        const isMultiKey = e.ctrlKey || e.metaKey || e.shiftKey;
-        if (isMultiKey) {
-          if (store.isShapeSelected(shapeId)) {
-            store.removeFromSelection(shapeId);
-          } else {
-            store.addToSelection(shapeId);
-          }
-          this.render();
-          return;
-        }
-
-        // If clicking a shape that is already part of a multi-selection,
-        // start group drag without resetting selection
-        const currentSelection = store.editorState.selection.shapeIds;
-        if (currentSelection.size > 1 && currentSelection.has(shapeId)) {
-          this.beginShapeDrag(worldPoint, shapeId);
-          this.render();
-          return;
-        }
-
-        // Single select + drag
-        store.setSelection(new Set([shapeId]));
-        this.beginShapeDrag(worldPoint, shapeId);
-      } else {
+    if (!shapeId && activeTool === "select") {
+      if (!e.shiftKey) {
         store.clearSelection();
       }
-    } else if (shapeId && activeTool === "pan") {
-      // Pan mode
+      this.interaction.startMarqueeSelect(worldPoint.x, worldPoint.y);
+      this.render();
+      return;
+    }
+
+    // PRIORITY 9: Pan tool — drag anywhere (including over shapes)
+    if (activeTool === "pan") {
       this.interaction.startPanning();
+      this.render();
+      return;
+    }
+
+    // PRIORITY 10: Select tool — shapes and marquee
+    if (activeTool === "select" && shapeId) {
+      const currentSelection = store.editorState.selection.shapeIds;
+      const isMultiKey = e.ctrlKey || e.metaKey || e.shiftKey;
+
+      if (isMultiKey) {
+        if (store.isShapeSelected(shapeId)) {
+          store.removeFromSelection(shapeId);
+        } else {
+          store.addToSelection(shapeId);
+        }
+        this.render();
+        return;
+      }
+
+      // Drag without changing selection when clicking an already-selected shape
+      if (currentSelection.has(shapeId)) {
+        this.beginShapeDrag(worldPoint, shapeId);
+        this.render();
+        return;
+      }
+
+      store.setSelection(new Set([shapeId]));
+      this.beginShapeDrag(worldPoint, shapeId);
     }
 
     this.render();
@@ -780,6 +689,7 @@ export class CanvasEngine {
     }
 
     if (mode === "panning") {
+      this.canvas.style.cursor = "grabbing";
       this.viewState.offsetX += e.movementX;
       this.viewState.offsetY += e.movementY;
       this.emitViewStateChange();
@@ -801,14 +711,17 @@ export class CanvasEngine {
 
     if (mode === "marquee-select") {
       const bounds = this.interaction.completeMarqueeSelect();
-      if (bounds) {
+      if (bounds && bounds.w > 2 && bounds.h > 2) {
         const shapes = store.getAllShapes();
         const selectedIds = shapes
           .filter((shape) => intersectsRect(bounds, shape))
           .map((s) => s.id);
         if (selectedIds.length > 0) {
-          store.setSelection(new Set(selectedIds));
-          // Record start positions for potential group drag
+          if (_e.shiftKey) {
+            selectedIds.forEach((id) => store.addToSelection(id));
+          } else {
+            store.setSelection(new Set(selectedIds));
+          }
           this.groupDragStartPositions = new Map(
             selectedIds.map((id) => {
               const s = store.getShape(id)!;
@@ -822,46 +735,38 @@ export class CanvasEngine {
     if (mode === "dragging") {
       this.interaction.stopDragging();
       this.groupDragStartPositions = null;
-      this.scheduleAutosave();
       this.pushHistorySnapshot();
     }
 
     if (mode === "creating-arrow") {
       const worldPoint = this.screenToWorld(_e.clientX, _e.clientY);
-      const iState = this.interaction.getState();
+      const arrowSourceId = iState.arrowSourceShapeId;
       const targetId = this.hitTestShapes(worldPoint);
 
-      // Complete arrow if we hit a different shape
-      if (
-        targetId &&
-        iState.arrowSourceShapeId &&
-        targetId !== iState.arrowSourceShapeId
-      ) {
-        this.createSemanticArrow(iState.arrowSourceShapeId, targetId);
+      // Drag-release onto a second shape (click-click is handled on mousedown)
+      if (targetId && arrowSourceId && targetId !== arrowSourceId) {
+        this.createSemanticArrow(arrowSourceId, targetId);
         this.pushHistorySnapshot();
-        this.scheduleAutosave();
+        this.interaction.cancelArrow();
+        store.clearSelection();
       }
-
-      // Cancel arrow mode
-      this.interaction.cancelArrow();
-      store.clearSelection();
+      // Do not cancel on mouseup otherwise — first click must stay active for the second click
     }
 
     if (mode === "resizing") {
       this.interaction.stopResizing();
       this.resizeStartShape = null;
-      this.scheduleAutosave();
       this.pushHistorySnapshot();
     }
 
     if (mode === "panning") {
       this.interaction.stopPanning();
+      this.updateCanvasCursor(this.interaction.getActiveTool());
     }
 
     if (mode === "drawing") {
       this.interaction.completeDrawing();
       this.pushHistorySnapshot();
-      this.scheduleAutosave();
     }
 
     this.render();
@@ -874,19 +779,22 @@ export class CanvasEngine {
   }
 
   private onDoubleClick(e: MouseEvent): void {
+    e.preventDefault();
     const worldPoint = this.screenToWorld(e.clientX, e.clientY);
     const shapeId = this.hitTestShapes(worldPoint);
     const store = useCanvasStore.getState();
-    
+
     if (shapeId) {
-      // Double-click on a shape: start text editing
       store.startEditing(shapeId);
       this.interaction.startTextEditing(shapeId);
       this.render();
-    } else {
-      // Double-click on empty canvas: start marquee/group selection
-      this.interaction.startMarqueeSelect(worldPoint.x, worldPoint.y);
+      return;
+    }
+
+    // Second click of a double-click already started marquee on mousedown — keep dragging
+    if (this.interaction.getMode() !== "marquee-select") {
       store.clearSelection();
+      this.interaction.startMarqueeSelect(worldPoint.x, worldPoint.y);
       this.render();
     }
   }
@@ -916,48 +824,72 @@ export class CanvasEngine {
     return { x, y };
   }
 
+  /** Touch center in canvas element coordinates (for zoom anchor). */
+  private getTouchCenterInCanvas(touches: TouchList): { x: number; y: number } {
+    const rect = this.canvas.getBoundingClientRect();
+    const center = this.getTouchCenterPoint(touches);
+    return { x: center.x - rect.left, y: center.y - rect.top };
+  }
+
+  private zoomAtScreenPoint(scale: number, screenX: number, screenY: number): void {
+    if (scale === 1) return;
+
+    const newZoom = Math.max(
+      ZOOM_MIN,
+      Math.min(ZOOM_MAX, this.viewState.zoom * scale)
+    );
+    const zoomChange = newZoom / this.viewState.zoom;
+
+    this.viewState.offsetX = screenX - (screenX - this.viewState.offsetX) * zoomChange;
+    this.viewState.offsetY = screenY - (screenY - this.viewState.offsetY) * zoomChange;
+    this.viewState.zoom = newZoom;
+  }
+
   private onTouchStart(e: TouchEvent): void {
-    e.preventDefault();
     if (e.touches.length === 2) {
+      e.preventDefault();
       this.isTwoFingerTouch = true;
       this.lastTouchDistance = this.getTouchDistance(e.touches);
-      const center = this.getTouchCenterPoint(e.touches);
+      const center = this.getTouchCenterInCanvas(e.touches);
       this.lastTouchX = center.x;
       this.lastTouchY = center.y;
-      this.interaction.startPanning();
     }
   }
 
   private onTouchMove(e: TouchEvent): void {
+    if (!this.isTwoFingerTouch || e.touches.length < 2) return;
+
     e.preventDefault();
-    if (this.isTwoFingerTouch && e.touches.length === 2) {
-      const currentDistance = this.getTouchDistance(e.touches);
-      const distanceDelta = Math.abs(currentDistance - this.lastTouchDistance);
-      
-      if (distanceDelta < 10) {
-        // Pan mode - not pinching, just panning
-        const center = this.getTouchCenterPoint(e.touches);
-        const movementX = center.x - this.lastTouchX;
-        const movementY = center.y - this.lastTouchY;
-        
-        this.viewState.offsetX += movementX;
-        this.viewState.offsetY += movementY;
-        
-        this.lastTouchX = center.x;
-        this.lastTouchY = center.y;
-        this.emitViewStateChange();
-        this.render();
-      }
-      
-      this.lastTouchDistance = currentDistance;
+
+    const currentDistance = this.getTouchDistance(e.touches);
+    const center = this.getTouchCenterInCanvas(e.touches);
+
+    // Pan: two-finger swipe (center moves, fingers move together)
+    const movementX = center.x - this.lastTouchX;
+    const movementY = center.y - this.lastTouchY;
+    if (movementX !== 0 || movementY !== 0) {
+      this.viewState.offsetX += movementX;
+      this.viewState.offsetY += movementY;
     }
+
+    // Zoom: pinch — fingers moving apart or together (distance change)
+    if (this.lastTouchDistance > 0 && currentDistance > 0) {
+      const scale = currentDistance / this.lastTouchDistance;
+      this.zoomAtScreenPoint(scale, center.x, center.y);
+    }
+
+    this.lastTouchDistance = currentDistance;
+    this.lastTouchX = center.x;
+    this.lastTouchY = center.y;
+
+    this.emitViewStateChange();
+    this.render();
   }
 
   private onTouchEnd(e: TouchEvent): void {
-    e.preventDefault();
     if (e.touches.length < 2) {
       this.isTwoFingerTouch = false;
-      this.interaction.stopPanning();
+      this.lastTouchDistance = 0;
       this.render();
     }
   }
@@ -985,7 +917,6 @@ export class CanvasEngine {
     if (e.key === "Delete" || e.key === "Backspace") {
       store.editorState.selection.shapeIds.forEach((id) => store.deleteShape(id));
       store.clearSelection();
-      this.scheduleAutosave();
       this.render();
       return;
     }
@@ -1012,7 +943,6 @@ export class CanvasEngine {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
       store.pasteFromClipboard();
       this.pushHistorySnapshot();
-      this.scheduleAutosave();
       this.render();
       return;
     }
@@ -1045,17 +975,12 @@ export class CanvasEngine {
   private onWheel(e: WheelEvent): void {
     e.preventDefault();
 
-    const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this.viewState.zoom * zoomDelta));
-
     const rect = this.canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const zoomChange = newZoom / this.viewState.zoom;
-    this.viewState.offsetX = mouseX - (mouseX - this.viewState.offsetX) * zoomChange;
-    this.viewState.offsetY = mouseY - (mouseY - this.viewState.offsetY) * zoomChange;
-    this.viewState.zoom = newZoom;
+    const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+    this.zoomAtScreenPoint(zoomDelta, mouseX, mouseY);
 
     this.emitViewStateChange();
     this.render();

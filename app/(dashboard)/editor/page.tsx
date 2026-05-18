@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SiteBrand, SiteHeader } from "@/components/site-header";
 import { createDesign, updateDesign } from "@/lib/actions/designs";
+import { useCanvasAutosave } from "@/hooks/useCanvasAutosave";
+import { clearLocalAutosave, readLocalAutosave } from "@/lib/canvas-autosave";
 import {
   Download,
   Save,
@@ -23,6 +25,7 @@ export default function EditorPage() {
   const [title, setTitle] = useState("Untitled Design");
   const [designId, setDesignId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
 
   const {
     shapes,
@@ -35,16 +38,11 @@ export default function EditorPage() {
     clear,
   } = useCanvasStore();
 
-  useEffect(() => {
-    // Mark that this is a fresh editor session (not a loaded design)
-    // This prevents autosave from being restored for unsaved designs
-    sessionStorage.setItem("design_loaded", "true");
-    
-    return () => {
-      // Cleanup on unmount
-      sessionStorage.removeItem("design_loaded");
-    };
-  }, []);
+  useCanvasAutosave({
+    designId,
+    title,
+    enabled: canvasReady,
+  });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -61,6 +59,25 @@ export default function EditorPage() {
       }
       engine = new CanvasEngine(canvas);
       engine.render();
+
+      const draft = readLocalAutosave(designId ?? "draft");
+      if (draft?.shapes?.length || draft?.arrows?.length) {
+        const store = useCanvasStore.getState();
+        if (store.getAllShapes().length === 0) {
+          store.loadSnapshot({
+            id: "draft",
+            version: 1,
+            timestamp: draft.savedAt,
+            shapes: draft.shapes,
+            arrows: draft.arrows,
+            viewState: engine.getViewState(),
+            metadata: { title: draft.title ?? "Untitled Design" },
+          });
+          if (draft.title) setTitle(draft.title);
+          engine.render();
+        }
+      }
+      setCanvasReady(true);
     };
 
     raf = window.requestAnimationFrame(init);
@@ -86,16 +103,18 @@ export default function EditorPage() {
         groups: [],
       };
 
+      let savedId = designId;
       if (designId) {
         await updateDesign(designId, token, { title, content });
       } else {
         const design = await createDesign(token, { title });
         await updateDesign(design.id, token, { title, content });
         setDesignId(design.id);
+        savedId = design.id;
       }
 
-      // Clear autosave after successful save
-      localStorage.removeItem("ctrl_design_autosave");
+      clearLocalAutosave("draft");
+      if (savedId) clearLocalAutosave(savedId);
       alert("Design saved successfully!");
     } catch {
       alert("Failed to save design");
