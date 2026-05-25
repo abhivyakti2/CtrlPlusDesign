@@ -191,20 +191,15 @@ function inferNodeType(shape: Shape): SemanticData["nodeType"] {
       return "database";
     case "queue":
     case "kafka":
-    case "message":
       return "queue";
     case "redis-cache":
       return "cache";
-    case "api-gateway":
+    case "octagon":
       return "gateway";
     case "auth":
       return "auth";
-    case "load-balancer":
+    case "diamond":
       return "load-balancer";
-    case "cdn":
-      return "external";
-    case "service":
-      return "service";
     default:
       return "custom";
   }

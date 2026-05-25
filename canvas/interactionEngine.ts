@@ -32,27 +32,19 @@ export class InteractionEngine {
     "select",
     "pan",
     "zoom",
-    "arrow", // arrow is special - requires two clicks
   ]);
 
-  // Temporary tools (return to select after use)
   private readonly TEMPORARY_TOOLS: Set<EditorTool> = new Set([
     "rectangle",
     "circle",
     "database",
     "cache",
-    "service",
-    "loadbalancer",
+    "diamond",
     "queue",
-    "cloud",
-    "apigateway",
+    "octagon",
     "auth",
-    "cdn",
-    "message",
-    "code-block",
-    "annotation",
-    "comment-bubble",
     "text",
+    "arrow",
   ]);
 
   constructor(options: InteractionEngineOptions = {}) {

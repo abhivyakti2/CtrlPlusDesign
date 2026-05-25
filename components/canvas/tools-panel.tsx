@@ -22,10 +22,10 @@ import {
   Copy,
   Settings,
   Group,
-  Code2,
-  StickyNote,
   MousePointer2,
   Hand,
+  Octagon,
+  Diamond,
 } from "lucide-react";
 
 const CANVAS_TOOLS = [
@@ -47,17 +47,10 @@ const SHAPE_TOOLS = [
   { id: "circle", name: "Circle", icon: <Circle size={18} /> },
   { id: "database", name: "Database", icon: <Database size={18} /> },
   { id: "cache", name: "Cache", icon: <Zap size={18} /> },
-  { id: "service", name: "Service", icon: <Server size={18} /> },
-  { id: "loadbalancer", name: "Load Balancer", icon: <Router size={18} /> },
+  { id: "diamond", name: "Diamond", icon: <Diamond size={18} /> },
   { id: "queue", name: "Queue", icon: <Layers size={18} /> },
-  { id: "cloud", name: "Cloud", icon: <Cloud size={18} /> },
-  { id: "apigateway", name: "API Gateway", icon: <Router size={18} /> },
+  { id: "octagon", name: "Octagon", icon: <Octagon size={18} /> },
   { id: "auth", name: "Auth", icon: <Lock size={18} /> },
-  { id: "cdn", name: "CDN", icon: <GitBranch size={18} /> },
-  { id: "message", name: "Message Bus", icon: <MessageSquare size={18} /> },
-  { id: "code-block", name: "Code Block", icon: <Code2 size={18} /> },
-  { id: "annotation", name: "Annotation", icon: <StickyNote size={18} /> },
-  { id: "comment-bubble", name: "Comment Bubble", icon: <MessageSquare size={18} /> },
   { id: "arrow", name: "Arrow", icon: <ArrowRight size={18} /> },
 ];
 
@@ -81,10 +74,12 @@ export const ToolsPanel: React.FC<ToolsPanelProps> = ({
   const activeClasses = "!bg-blue-600 !text-white !border-blue-500";
 
   return (
-    <div className="bg-gray-900 border-r border-gray-800 w-80 overflow-y-auto flex flex-col">
+    <div className="bg-gray-900 border-r border-gray-800 w-80 h-full min-h-0 shrink-0 overflow-y-auto flex flex-col">
       <div className="p-4 border-b border-gray-800">
         <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Tools & Shapes</h3>
-        {currentTool !== "select" && <p className="text-xs text-blue-400 mt-1">Active: {currentTool}</p>}
+        <div className="h-5 mt-1">
+          {currentTool !== "select" && <p className="text-xs text-blue-400">Active: {currentTool}</p>}
+        </div>
       </div>
 
       <div className="px-4 pt-4">
@@ -104,13 +99,15 @@ export const ToolsPanel: React.FC<ToolsPanelProps> = ({
             </button>
           ))}
         </div>
-        <p className="text-xs text-gray-500 mt-2">
-          {currentTool === "pan"
-            ? "Drag the canvas to pan. Use two-finger swipe on touch."
-            : currentTool === "select"
-              ? "Drag shapes to move. Empty drag box-selects. Shift adds to selection."
-              : null}
-        </p>
+        <div className="h-10 mt-2">
+          <p className="text-xs text-gray-500">
+            {currentTool === "pan"
+              ? "Drag the canvas to pan. Use two-finger swipe on touch."
+              : currentTool === "select"
+                ? "Drag shapes to move. Empty drag box-selects. Shift adds to selection."
+                : null}
+          </p>
+        </div>
       </div>
 
       <Tabs defaultValue="shapes" className="flex-1 flex flex-col">

@@ -71,12 +71,12 @@ export const SHAPE_DEFAULTS = {
     strokeColor: "#06b6d4",
     strokeWidth: 2,
   },
-  "api-gateway": {
+  octagon: {
     fillColor: "transparent",
     strokeColor: "#8b5cf6",
     strokeWidth: 2,
   },
-  "load-balancer": {
+  diamond: {
     fillColor: "transparent",
     strokeColor: "#ec4899",
     strokeWidth: 2,
@@ -91,29 +91,14 @@ export const SHAPE_DEFAULTS = {
     strokeColor: "#ef4444",
     strokeWidth: 2,
   },
-  cdn: {
-    fillColor: "transparent",
-    strokeColor: "#10b981",
-    strokeWidth: 2,
-  },
   kafka: {
     fillColor: "transparent",
     strokeColor: "#6b7280",
     strokeWidth: 2,
   },
-  service: {
-    fillColor: "transparent",
-    strokeColor: "#3b82f6",
-    strokeWidth: 2,
-  },
   auth: {
     fillColor: "transparent",
     strokeColor: "#d946ef",
-    strokeWidth: 2,
-  },
-  message: {
-    fillColor: "transparent",
-    strokeColor: "#06b6d4",
     strokeWidth: 2,
   },
   arrow: {
@@ -124,21 +109,6 @@ export const SHAPE_DEFAULTS = {
   text: {
     fillColor: "transparent",
     strokeColor: "#fef3c7",
-    strokeWidth: 1,
-  },
-  "code-block": {
-    fillColor: "rgba(17, 24, 39, 0.4)",
-    strokeColor: "#334155",
-    strokeWidth: 1,
-  },
-  annotation: {
-    fillColor: "rgba(254, 243, 199, 0.1)",
-    strokeColor: "#f59e0b",
-    strokeWidth: 1,
-  },
-  "comment-bubble": {
-    fillColor: "rgba(15, 23, 42, 0.3)",
-    strokeColor: "#3b82f6",
     strokeWidth: 1,
   },
 };

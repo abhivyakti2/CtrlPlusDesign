@@ -347,7 +347,6 @@ export class CanvasEngine {
 
   private createShapeFromTool(currentTool: EditorTool, worldPoint: Vec2): Shape | null {
     if (
-      currentTool === "arrow" ||
       currentTool === "select" ||
       currentTool === "pan" ||
       currentTool === "zoom" ||
@@ -361,18 +360,12 @@ export class CanvasEngine {
       circle: "circle",
       database: "cylinder",
       cache: "redis-cache",
-      service: "service",
-      loadbalancer: "load-balancer",
+      diamond: "diamond",
       queue: "queue",
-      cloud: "rounded-rect",
-      apigateway: "api-gateway",
+      octagon: "octagon",
       auth: "auth",
-      cdn: "cdn",
-      message: "message",
       text: "text",
-      "code-block": "code-block",
-      annotation: "annotation",
-      "comment-bubble": "comment-bubble",
+      arrow: "arrow",
     };
 
     const shapeType = toolToShapeMap[currentTool] ?? "rectangle";
@@ -381,15 +374,12 @@ export class CanvasEngine {
     const sizeMap: Partial<Record<EditorTool, [number, number]>> = {
       circle: [110, 110],
       database: [170, 100],
-      loadbalancer: [120, 120],
-      apigateway: [160, 100],
+      diamond: [120, 120],
+      octagon: [160, 100],
       auth: [130, 80],
-      cdn: [150, 150],
       queue: [130, 100],
       text: [200, 80],
-      "code-block": [300, 180],
-      annotation: [220, 130],
-      "comment-bubble": [200, 100],
+      arrow: [140, 60],
     };
 
     const [w, h] = sizeMap[currentTool] ?? [140, 90];
@@ -486,28 +476,7 @@ export class CanvasEngine {
 
     const activeTool = this.interaction.getActiveTool();
 
-    // PRIORITY 3: Arrow tool - special two-click handling
-    if (activeTool === "arrow") {
-      const hitId = this.hitTestShapes(worldPoint);
-      if (hitId) {
-        if (!iState.arrowSourceShapeId) {
-          // First click - start arrow from this shape
-          this.interaction.startArrow(hitId);
-          store.setSelection(new Set([hitId]));
-        } else if (hitId !== iState.arrowSourceShapeId) {
-          // Second click - complete arrow to target
-          this.createSemanticArrow(iState.arrowSourceShapeId, hitId);
-          this.pushHistorySnapshot();
-          this.interaction.cancelArrow();
-          store.clearSelection();
-        }
-      } else {
-        this.interaction.cancelArrow();
-        store.clearSelection();
-      }
-      this.render();
-      return;
-    }
+    // Removed PRIORITY 3: Arrow tool - special two-click handling (now a normal shape)
 
     // PRIORITY 4: Drawing tools - create shape and auto-return to select
     // Ignore extra mousedown while a shape is still being placed (mouseup completes it).

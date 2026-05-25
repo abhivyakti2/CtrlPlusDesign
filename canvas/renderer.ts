@@ -141,16 +141,12 @@ export class CanvasRenderer {
             case "circle": this.drawCircle(shape); break;
             case "database":
             case "cylinder": this.drawCylinder(shape); break;
-            case "api-gateway": this.drawApiGateway(shape); break;
-            case "load-balancer": this.drawLoadBalancer(shape); break;
+            case "octagon": this.drawOctagon(shape); break;
+            case "diamond": this.drawDiamond(shape); break;
             case "queue": this.drawQueue(shape); break;
             case "redis-cache": this.drawRedisCache(shape); break;
-            case "cdn": this.drawCdn(shape); break;
             case "kafka": this.drawKafka(shape); break;
-            case "service": this.drawService(shape); break;
             case "auth": this.drawAuth(shape); break;
-            case "message": this.drawMessage(shape); break;
-            case "comment-bubble": this.drawCommentBubble(shape); break;
             case "worker": this.drawWorker(shape); break;
             case "storage": this.drawStorage(shape); break;
             case "analytics": this.drawAnalytics(shape); break;
@@ -163,8 +159,7 @@ export class CanvasRenderer {
             case "group":
             case "container": this.drawContainer(shape); break;
             case "text": this.drawText(shape); break;
-            case "code-block": this.drawCodeBlock(shape); break;
-            case "annotation": this.drawAnnotation(shape); break;
+            case "arrow": this.drawArrowShape(shape); break;
             default: this.drawRectangle(shape); break;
         }
 
@@ -224,7 +219,7 @@ export class CanvasRenderer {
         this.drawLabel(shape.label, cx, y + h / 2 + ry / 2, w - 12, 12, COLORS.textPrimary);
     }
 
-    private drawApiGateway(shape: Shape): void {
+    private drawOctagon(shape: Shape): void {
         const { x, y, w, h } = shape;
         // Draw as hexagon
         const cx = x + w / 2;
@@ -249,7 +244,7 @@ export class CanvasRenderer {
         this.drawLabel(shape.label, cx, cy, w - 12, 13, COLORS.textPrimary);
     }
 
-    private drawLoadBalancer(shape: Shape): void {
+    private drawDiamond(shape: Shape): void {
         const { x, y, w, h } = shape;
         const cx = x + w / 2;
         const cy = y + h / 2;
@@ -313,21 +308,6 @@ export class CanvasRenderer {
         }
     }
 
-    private drawCdn(shape: Shape): void {
-        const { x, y, w, h } = shape;
-        this.roundRect(x, y, w, h, 20);
-        if (shape.fillColor !== "transparent") this.ctx.fill();
-        this.ctx.stroke();
-
-        this.ctx.fillStyle = shape.strokeColor;
-        this.ctx.font = "bold 9px Outfit, monospace";
-        this.ctx.textAlign = "left";
-        this.ctx.textBaseline = "top";
-        this.ctx.fillText("CDN", x + 8, y + 8);
-
-        this.drawLabel(shape.label, x + w / 2, y + h / 2 + 4, w - 16, 12, COLORS.textPrimary);
-    }
-
     private drawKafka(shape: Shape): void {
         const { x, y, w, h } = shape;
         // Kafka icon: hexagon-ish or parallelogram
@@ -348,14 +328,6 @@ export class CanvasRenderer {
         this.ctx.fillText("Kafka", x + off + 4, y + 6);
 
         this.drawLabel(shape.label, x + w / 2, y + h / 2 + 6, w - 16, 12, COLORS.textPrimary);
-    }
-
-    private drawService(shape: Shape): void {
-        const { x, y, w, h } = shape;
-        this.roundRect(x, y, w, h, 8);
-        if (shape.fillColor !== "transparent") this.ctx.fill();
-        this.ctx.stroke();
-        this.drawLabel(shape.label, x + w / 2, y + h / 2, w - 12, 13, COLORS.textPrimary);
     }
 
     private drawAuth(shape: Shape): void {
@@ -413,91 +385,29 @@ export class CanvasRenderer {
         });
     }
 
-    private drawCodeBlock(shape: Shape): void {
-        const { x, y, w, h } = shape;
-        this.roundRect(x, y, w, h, 6);
-        this.ctx.fillStyle = "rgba(15,23,42,0.6)";
-        this.ctx.fill();
-        this.ctx.strokeStyle = "#334155";
-        this.ctx.lineWidth = 1;
-        this.ctx.stroke();
-
-        // Header bar
-        this.ctx.fillStyle = "#1e293b";
-        this.roundRect(x, y, w, 24, 6);
-        this.ctx.fill();
-
-        this.ctx.font = "11px Outfit, monospace";
-        this.ctx.fillStyle = "#94a3b8";
-        this.ctx.textAlign = "left";
-        this.ctx.textBaseline = "middle";
-        this.ctx.fillText(shape.label || "Code", x + 10, y + 12, w - 20);
-    }
-
-    private drawAnnotation(shape: Shape): void {
-        const { x, y, w, h } = shape;
-        this.ctx.save();
-        this.ctx.globalAlpha = 0.9;
-        this.roundRect(x, y, w, h, 6);
-        this.ctx.fillStyle = "rgba(254,243,199,0.12)";
-        this.ctx.fill();
-        this.ctx.strokeStyle = "#f59e0b";
-        this.ctx.lineWidth = 1;
-        this.ctx.stroke();
-        this.ctx.restore();
-
-        this.ctx.font = "12px Outfit, sans-serif";
-        this.ctx.fillStyle = "#fef3c7";
-        this.ctx.textAlign = "left";
-        this.ctx.textBaseline = "top";
-        const lines = (shape.label || "").split("\n");
-        lines.forEach((line, i) => {
-            this.ctx.fillText(line, x + 8, y + 8 + i * 16, w - 16);
-        });
-    }
-
-    private drawMessage(shape: Shape): void {
+    private drawArrowShape(shape: Shape): void {
         const { x, y, w, h } = shape;
         const cx = x + w / 2;
         const cy = y + h / 2;
-
-        // Draw as rounded rectangle with message tail
-        this.roundRect(x, y, w, h - 8, 8);
-        if (shape.fillColor !== "transparent") this.ctx.fill();
-        this.ctx.stroke();
-
-        // Message tail triangle at bottom
+        
+        // Block arrow pointing right
+        const arrowHeadW = w * 0.4;
+        const arrowTailH = h * 0.4;
+        
         this.ctx.beginPath();
-        this.ctx.moveTo(cx - 8, y + h - 8);
-        this.ctx.lineTo(cx + 8, y + h - 8);
-        this.ctx.lineTo(cx, y + h);
+        this.ctx.moveTo(x, cy - arrowTailH / 2); // left top
+        this.ctx.lineTo(x + w - arrowHeadW, cy - arrowTailH / 2); // tail top right
+        this.ctx.lineTo(x + w - arrowHeadW, y); // arrow head top
+        this.ctx.lineTo(x + w, cy); // arrow head tip
+        this.ctx.lineTo(x + w - arrowHeadW, y + h); // arrow head bottom
+        this.ctx.lineTo(x + w - arrowHeadW, cy + arrowTailH / 2); // tail bottom right
+        this.ctx.lineTo(x, cy + arrowTailH / 2); // left bottom
         this.ctx.closePath();
+
         if (shape.fillColor !== "transparent") this.ctx.fill();
         this.ctx.stroke();
 
-        this.drawLabel(shape.label, cx, cy - 4, w - 16, 12, COLORS.textPrimary);
-    }
-
-    private drawCommentBubble(shape: Shape): void {
-        const { x, y, w, h } = shape;
-        const cx = x + w / 2;
-        const cy = y + h / 2;
-
-        // Draw as speech bubble (rounded rect with tail pointing left)
-        this.roundRect(x + 8, y, w - 8, h, 8);
-        if (shape.fillColor !== "transparent") this.ctx.fill();
-        this.ctx.stroke();
-
-        // Tail triangle on left
-        this.ctx.beginPath();
-        this.ctx.moveTo(x + 8, cy - 6);
-        this.ctx.lineTo(x + 8, cy + 6);
-        this.ctx.lineTo(x - 4, cy);
-        this.ctx.closePath();
-        if (shape.fillColor !== "transparent") this.ctx.fill();
-        this.ctx.stroke();
-
-        this.drawLabel(shape.label, cx + 4, cy, w - 20, 12, COLORS.textPrimary);
+        this.drawLabel(shape.label, cx, cy, w - 12, 13, COLORS.textPrimary);
     }
 
     private drawWorker(shape: Shape): void {
